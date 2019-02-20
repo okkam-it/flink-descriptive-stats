@@ -47,7 +47,7 @@ public class ProfileJob {
 		Row[] ret = new Row[size];
 		for (int i = 0; i < size; i++) {
 //			if (i % 3 == 0) {
-				ret[i] = Row.of(true, "3", rand.nextGaussian());
+			ret[i] = Row.of(true, "3", rand.nextGaussian());
 //				ret[i] = Row.of(true, "3", 1);
 //			} else if (i % 7 == 0) {
 //				ret[i] = Row.of(true, "7", 1);
@@ -167,17 +167,7 @@ public class ProfileJob {
 				.first(TOP_SIZE);
 		final DataSet<StatsPojo> wordFreq = topValues//
 				.groupBy(x -> 0)// fake group key
-				// .reduceGroup((it, out) -> out.collect(new StatsPojo(colIndex,
-				// "word").setTopValues(it)));
-				.reduceGroup(new GroupReduceFunction<Tuple2<String, Long>, StatsPojo>() {
-
-					private static final long serialVersionUID = 1L;
-
-					@Override
-					public void reduce(Iterable<Tuple2<String, Long>> it, Collector<StatsPojo> out) throws Exception {
-						out.collect(new StatsPojo(colIndex, StatsPojo.TYPE_WORD).setTopValues(it));
-					}
-				});
+				.reduceGroup(new ReduceTopStrings(colIndex)).name("reduceTopStrings()");
 
 		// TOP K PATTERNS
 		final DataSet<Tuple2<String, Long>> patternPairs = stringStats//
@@ -189,20 +179,39 @@ public class ProfileJob {
 				.first(TOP_SIZE);
 		final DataSet<StatsPojo> patternFreq = topPatterns//
 				.groupBy(x -> 0)// fake group key
-				.reduceGroup(new GroupReduceFunction<Tuple2<String, Long>, StatsPojo>() {
-
-					private static final long serialVersionUID = 1L;
-
-					@Override
-					public void reduce(Iterable<Tuple2<String, Long>> it, Collector<StatsPojo> out) throws Exception {
-						out.collect(new StatsPojo(colIndex, StatsPojo.TYPE_PATTERN).setTopPatterns(it));
-					}
-				});
-		// .reduceGroup((it, out) -> out.collect(new StatsPojo(colIndex,
-		// "pattern").setTopPatterns(it)));
+				.reduceGroup(new ReduceTopPatterns(colIndex))//
+				.name("reduceTopPatterns()");
 
 		// merge all stats
 		return columnStats.union(wordFreq).union(patternFreq);
+	}
+
+	private static final class ReduceTopPatterns implements GroupReduceFunction<Tuple2<String, Long>, StatsPojo> {
+		private final int colIndex;
+		private static final long serialVersionUID = 1L;
+
+		private ReduceTopPatterns(int colIndex) {
+			this.colIndex = colIndex;
+		}
+
+		@Override
+		public void reduce(Iterable<Tuple2<String, Long>> it, Collector<StatsPojo> out) throws Exception {
+			out.collect(new StatsPojo(colIndex, StatsPojo.TYPE_PATTERN).setTopPatterns(it));
+		}
+	}
+
+	private static final class ReduceTopStrings implements GroupReduceFunction<Tuple2<String, Long>, StatsPojo> {
+		private final int colIndex;
+		private static final long serialVersionUID = 1L;
+
+		private ReduceTopStrings(int colIndex) {
+			this.colIndex = colIndex;
+		}
+
+		@Override
+		public void reduce(Iterable<Tuple2<String, Long>> it, Collector<StatsPojo> out) throws Exception {
+			out.collect(new StatsPojo(colIndex, StatsPojo.TYPE_WORD).setTopValues(it));
+		}
 	}
 
 }

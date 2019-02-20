@@ -347,15 +347,8 @@ public class StatsPojo implements Serializable {
 			ret.append(String.format("%nKurtosis (sample): %.3f", getSampleKurtosis()));
 			ret.append(String.format("%nKurtosis error (sample): %.3f", getSampleKurtosisStdError()));
 
-			// if excess == 0 --> Mesokurtic distibution: Normal and Binomial distributions
-			// if excess > 0 --> Leptokurtik distibution (aka super-Gaussian distributions):
-			// ..... distribution has "fatter tails" --> Student't, Rayleigh, Laplace,
-			// ............ Exponential, Poisson, Logistic
-			// ..... REMARK: usually there are outliers so check the data...
-			// if excess < 0 --> Platykurtic distibution (aka sub-Gaussian distributions)
-			// ....... distribution has "thinner tails" --> Continuous, Uniform, Bernoulli
-			ret.append(String.format("%nExcess of Kurtosis (population): %.3f", getPopulationExcessOfKurtosis()));
-			ret.append(String.format("%nExcess of Kurtosis (sample): %.3f", getSampleExcessOfKurtosis()));
+			printExcessOfKurtosis(ret, "population", getPopulationExcessOfKurtosis());
+			printExcessOfKurtosis(ret, "sample", getSampleExcessOfKurtosis());
 
 			final Double jarqueBeraScore = getSampleJarqueBeraScore();
 			ret.append(String.format("%nJarqueBeraScore (sample ex): %.3f", jarqueBeraScore));
@@ -363,20 +356,19 @@ public class StatsPojo implements Serializable {
 		}
 		// string values only
 		if (topValues != null) {
-			ret.append("\n------ STATS for string column only");
-			ret.append("\n------ TYPE STATS:");
+			ret.append("\n-- TYPE STATS:");
 			ret.append("\n\tboolean values: " + booleanValues + "");
 			ret.append("\n\tint values: " + intValues);
 			ret.append("\n\tlong values: " + longValues);
 			ret.append("\n\tfloat values: " + floatValues);
 			ret.append("\n\tdouble values: " + doubleValues);
 			ret.append("\n\tdate values: " + dateValues);
-			ret.append("\n------ TOP-" + k + " VALUES:");
+			ret.append("\n-- TOP VALUES:");
 			topValues.entrySet()//
 					.stream()//
 					.sorted((x, y) -> y.getValue().compareTo(x.getValue()))//
 					.forEach(x -> ret.append("\n\t").append(x.getKey() + " => " + x.getValue()));
-			ret.append("\n------ TOP-" + k + " PATTERNS:");
+			ret.append("\n-- TOP PATTERNS:");
 			topPatterns.entrySet()//
 					.stream()//
 					.sorted((x, y) -> y.getValue().compareTo(x.getValue()))//
@@ -384,6 +376,25 @@ public class StatsPojo implements Serializable {
 		}
 		return ret.toString();
 
+	}
+
+	private void printExcessOfKurtosis(StringBuilder ret, String type, final Double excess) {
+		final String interpr = getKurtosisInterpretation(excess);
+		ret.append(String.format("%nExcess of Kurtosis (%s): %.3f => %s", type, excess, interpr));
+	}
+
+	private String getKurtosisInterpretation(Double excess) {
+		if (excess == 0) {
+			// e.g. Normal distributions, Binomial
+			return "Mesokurtic distibution";
+		}
+		if (excess > 0) {// distribution has "fatter tails
+			// e.g. Student's t, Rayleigh, Laplace, Exponential, Poisson, Logistic
+			return "Leptokurtik distibution (or super-Gaussian distributions)";
+			// ..... REMARK: usually there are outliers so check the data...
+		} // else excess < 0 distribution has "thinner tails"
+			// e.g. Bernoulli
+		return "Platykurtic distibution (or sub-Gaussian distributions)";
 	}
 
 	// jarqueBeraScore thresholds follows a chi-square distribution with df=2
