@@ -63,28 +63,28 @@ public class StatsPojo implements Serializable {
 		this.columnIndex = columnIndex;
 	}
 
-	public double getVariancePopulation() {
+	public double getPopulationVariance() {
 		return unormalizedVariance / numericValues;
 	}
 
-	public double getVarianceSample() {
+	public double getSampleVariance() {
 		return unormalizedVariance / (numericValues - 1);
 	}
 
-	public double getVarianceSampleStdError() {
-		return getVarianceSample() * Math.sqrt(2.0 / (numericValues - 1.0));
+	public double getSampleVarianceStdError() {
+		return getSampleVariance() * Math.sqrt(2.0 / (numericValues - 1.0));
 	}
 
-	public Double getStdDevPopulation() {
-		return Math.sqrt(getVariancePopulation());
+	public Double getPopulationStdDev() {
+		return Math.sqrt(getPopulationVariance());
 	}
 
-	public Double getStdDevSample() {
-		return Math.sqrt(getVarianceSample());
+	public Double getSampleStdDev() {
+		return Math.sqrt(getSampleVariance());
 	}
 
-	public double getStdDevSampleStdError() {
-		return getStdDevSample() * (1.0 / Math.sqrt(2.0 * (numericValues - 1)));
+	public double getSampleStdDevStdError() {
+		return getSampleStdDev() * (1.0 / Math.sqrt(2.0 * (numericValues - 1)));
 	}
 
 	public Double getMean() {
@@ -92,7 +92,7 @@ public class StatsPojo implements Serializable {
 	}
 
 	public Double getMeanSquareError() {
-		return getStdDevSample() / Math.sqrt(numericValues);
+		return getSampleStdDev() / Math.sqrt(numericValues);
 	}
 
 	public Double getPopulationSkewness() {
@@ -121,12 +121,21 @@ public class StatsPojo implements Serializable {
 				* Math.sqrt((Math.pow(numericValues, 2.0) - 1.0) / ((numericValues - 3.0) * (numericValues + 5.0)));
 	}
 
-	public Double getExcessPopulationKurtosis() {
+	public Double getPopulationExcessOfKurtosis() {
 		return getPopulationKurtosis() - 3.0;
 	}
 
-	public Double getExcessSampleKurtosis() {
+	public Double getSampleExcessOfKurtosis() {
 		return getSampleKurtosis() - 3.0;
+	}
+
+	public Double getSampleJarqueBeraScore() {
+		if (numericValues == 0) {
+			return Double.NaN;
+		}
+		return (numericValues / 6.0)
+				* (Math.pow(getSampleSkewness(), 2.0) + 0.25 * Math.pow(getSampleExcessOfKurtosis(), 2.0));
+
 	}
 
 	/**
@@ -315,36 +324,44 @@ public class StatsPojo implements Serializable {
 		ret.append("\nNumeric values: " + getNullValues());
 		ret.append("\nNull values: " + getNullValues());
 		ret.append("\nEmpty strings: " + getEmptyString());
-		ret.append(String.format("%nMean: %.3f", getMean()));
-		ret.append(String.format("%nMean square error (MSE): %.3f", getMeanSquareError()));
-		ret.append(String.format("%nVariance (population): %.3f", getVariancePopulation()));
-		ret.append(String.format("%nStdDev (population): %.3f", getStdDevPopulation()));
-		ret.append(String.format("%nVariance (sample): %.3f", getVarianceSample()));
-		ret.append(String.format("%nVariance error (sample): %.3f", getVarianceSampleStdError()));
-		ret.append(String.format("%nStdDev (sample): %.3f", getStdDevSample()));
-		ret.append(String.format("%nStdDev error (sample) : %.3f", getStdDevSampleStdError()));
-		ret.append("\nMin: " + getMin());
-		ret.append("\nMax: " + getMax());
 		ret.append("\nMinLength: " + getMinLength());
 		ret.append("\nMaxLength: " + getMaxLength());
 		ret.append(String.format("%nAvgLength: %.3f", getAvgLength()));
-		ret.append(String.format("%nSkewness (population): %.3f", getPopulationSkewness()));
-		ret.append(String.format("%nSkewness (sample): %.3f", getSampleSkewness()));
-		ret.append(String.format("%nSkewness error (sample): %.3f", getSampleSkewnessStdError()));
-		ret.append(String.format("%nKurtosis (population): %.3f", getPopulationKurtosis()));
-		ret.append(String.format("%nKurtosis (sample): %.3f", getSampleKurtosis()));
-		ret.append(String.format("%nKurtosis error (sample): %.3f", getSampleKurtosisStdError()));
 
-		// if excess == 0 --> Mesokurtic distibution: Normal and Binomial distributions
-		// if excess > 0 --> Leptokurtik distibution (aka super-Gaussian distributions):
-		// ..... distribution has "fatter tails" --> Student't, Rayleigh, Laplace,
-		// ............ Exponential, Poisson, Logistic
-		// ..... REMARK: usually there are outliers so check the data...
-		// if excess < 0 --> Platykurtic distibution (aka sub-Gaussian distributions)
-		// ....... distribution has "thinner tails" --> Continuous, Uniform, Bernoulli
-		ret.append(String.format("%nKurtosis (population ex): %.3f", getExcessPopulationKurtosis()));
-		ret.append(String.format("%nKurtosis (sample ex): %.3f", getExcessSampleKurtosis()));
+		// numeric values only
+		if (numericValues > 0) {
+			ret.append("\nMin: " + getMin());
+			ret.append("\nMax: " + getMax());
+			ret.append(String.format("%nMean: %.3f", getMean()));
+			ret.append(String.format("%nMean square error (MSE): %.3f", getMeanSquareError()));
+			ret.append(String.format("%nVariance (population): %.3f", getPopulationVariance()));
+			ret.append(String.format("%nStdDev (population): %.3f", getPopulationStdDev()));
+			ret.append(String.format("%nVariance (sample): %.3f", getSampleVariance()));
+			ret.append(String.format("%nVariance error (sample): %.3f", getSampleVarianceStdError()));
+			ret.append(String.format("%nStdDev (sample): %.3f", getSampleStdDev()));
+			ret.append(String.format("%nStdDev error (sample) : %.3f", getSampleStdDevStdError()));
+			ret.append(String.format("%nSkewness (population): %.3f", getPopulationSkewness()));
+			ret.append(String.format("%nSkewness (sample): %.3f", getSampleSkewness()));
+			ret.append(String.format("%nSkewness error (sample): %.3f", getSampleSkewnessStdError()));
+			ret.append(String.format("%nKurtosis (population): %.3f", getPopulationKurtosis()));
+			ret.append(String.format("%nKurtosis (sample): %.3f", getSampleKurtosis()));
+			ret.append(String.format("%nKurtosis error (sample): %.3f", getSampleKurtosisStdError()));
 
+			// if excess == 0 --> Mesokurtic distibution: Normal and Binomial distributions
+			// if excess > 0 --> Leptokurtik distibution (aka super-Gaussian distributions):
+			// ..... distribution has "fatter tails" --> Student't, Rayleigh, Laplace,
+			// ............ Exponential, Poisson, Logistic
+			// ..... REMARK: usually there are outliers so check the data...
+			// if excess < 0 --> Platykurtic distibution (aka sub-Gaussian distributions)
+			// ....... distribution has "thinner tails" --> Continuous, Uniform, Bernoulli
+			ret.append(String.format("%nExcess of Kurtosis (population): %.3f", getPopulationExcessOfKurtosis()));
+			ret.append(String.format("%nExcess of Kurtosis (sample): %.3f", getSampleExcessOfKurtosis()));
+
+			final Double jarqueBeraScore = getSampleJarqueBeraScore();
+			ret.append(String.format("%nJarqueBeraScore (sample ex): %.3f", jarqueBeraScore));
+			printJarqueBeraInfo(ret, jarqueBeraScore);
+		}
+		// string values only
 		if (topValues != null) {
 			ret.append("\n------ STATS for string column only");
 			ret.append("\n------ TYPE STATS:");
@@ -367,6 +384,27 @@ public class StatsPojo implements Serializable {
 		}
 		return ret.toString();
 
+	}
+
+	// jarqueBeraScore thresholds follows a chi-square distribution with df=2
+	// (but only for high-cardinality samples)
+	// http://academicos.fciencias.unam.mx/wp-content/uploads/sites/91/2015/04/jarque_bera_87.pdf
+	// https://people.smp.uq.edu.au/YoniNazarathy/stat_models_B_course_spring_07/distributions/chisqtab.pdf
+	private void printJarqueBeraInfo(StringBuilder ret, final Double jarqueBeraScore) {
+		ret.append("\n\tHypothesis testing (Null hypothesis H0 = Field is normally distributed):");
+		ret.append("\n\tWARNING: small sample size can leads to non-accurate conclusions (current size="
+				+ getNonNullValues() + ")");
+		ret.append("\n\t\t----------------------------------------------");
+		ret.append("\n\t\tAlpha    CDF   Critical Value     Conclusion");
+		ret.append("\n\t\t---------------------------------------------");
+		ret.append("\n\t\t 10%\t90.0%\t" + getJarqueBeraConclusion(jarqueBeraScore, 4.61));// .1
+		ret.append("\n\t\t  5%\t95.0%\t" + getJarqueBeraConclusion(jarqueBeraScore, 5.99));// .05
+		ret.append("\n\t\t2.5%\t97.5%\t" + getJarqueBeraConclusion(jarqueBeraScore, 7.38));// .025
+		ret.append("\n\t\t  1%\t99.0%\t" + getJarqueBeraConclusion(jarqueBeraScore, 9.21));// .01
+	}
+
+	private String getJarqueBeraConclusion(final Double jarqueBeraScore, final double threshold) {
+		return String.format("    %.3f\t  H0 %s", threshold, jarqueBeraScore > threshold ? "REJECTED" : "ACCEPTED");
 	}
 
 	/**
