@@ -28,16 +28,19 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.AbstractID;
 import org.apache.flink.util.Collector;
 
-//Inspired by:
-//Test Pairwise Algorithm: http://i.stanford.edu/pub/cstr/reports/cs/tr/79/773/CS-TR-79-773.pdf
-//Philippe Pebay:
-// - https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
-// - http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.214.8508&rep=rep1&type=pdf
+//Mainly inspired by:
+//- (Philippe Pebay) http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.214.8508&rep=rep1&type=pdf
+// -(Chan, Golub, LeVeque): http://i.stanford.edu/pub/cstr/reports/cs/tr/79/773/CS-TR-79-773.pdf
+// -(Philippe Pebay) https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
+//Standard errors: 
+// - (Ahn, Fessler) http://web.eecs.umich.edu/~fessler/papers/files/tr/stderr.pdf
+//Skew and kurtosis: 
+// - (Stuart McCrary) https://www.thinkbrg.com/media/publication/720_720_McCrary_ImplementingAlgorithms_Whitepaper_20151119_WEB.pdf
 public class ProfileJob {
 
 	private static final int TOP_SIZE = 20;
 	private static final String[] COLUMN_NAMES = new String[] { "col1", "col2", "col3" };
-	private static final int NUM_ELEMENTS = 12;
+	private static final int NUM_ELEMENTS = 1200;
 
 	private static Row[] getRowArray(int size) {
 		Row[] ret = new Row[size];
@@ -51,7 +54,7 @@ public class ProfileJob {
 			} else {
 				ret[i] = Row.of(true, "" + i, i);
 			}
-		} //
+		}
 		return ret;
 	}
 
@@ -70,7 +73,9 @@ public class ProfileJob {
 		env.getConfig().setGlobalJobParameters(params);
 
 		final DataSet<Row> rows = env.fromElements(getRowArray(NUM_ELEMENTS));
-		final RowTypeInfo rowType = (RowTypeInfo) rows.getType();
+		final RowTypeInfo rowsType = (RowTypeInfo) rows.getType();
+		final String tableHeader = String.join(",", COLUMN_NAMES);
+		final Table rowsTable = btEnv.fromDataSet(rows, tableHeader);
 
 		// TODO compute distinct rows
 		// TODO compute quartiles
@@ -83,18 +88,17 @@ public class ProfileJob {
 		for (int i = 0; i < COLUMN_NAMES.length; i++) {
 			final int colIndex = i;
 			// apply algorithm on a column
-			final String colName = COLUMN_NAMES[colIndex];
-			final String tableHeader = String.join(",", COLUMN_NAMES);
-			final Table colTable = btEnv.fromDataSet(rows, tableHeader).select(colName);
-			final TypeInformation<?> colType = rowType.getFieldTypes()[colIndex];
+			final Table colTable = rowsTable.select(COLUMN_NAMES[colIndex]);
+			final TypeInformation<?> colType = rowsType.getFieldTypes()[colIndex];
 			final DataSet<Row> columnData = btEnv.toDataSet(colTable, new RowTypeInfo(colType));
 
 			// base stats
 			final DataSet<StatsPojo> basicStats = columnData //
-					.map(new Row2StatsPojo(colIndex))//
-					.reduce((v1, v2) -> v1.reduce(v2));
+					.map(new Row2StatsPojo(colIndex)).name("row => statsPojo")//
+					.reduce((v1, v2) -> v1.reduce(v2)).name("reduceStatsPojos()");
 			// merge all column (basic) stats
-			columnStats = columnStats == null ? basicStats : columnStats.union(basicStats);
+			columnStats = columnStats == null ? basicStats
+					: columnStats.union(basicStats).name("addBasicStatsOfCol(" + colIndex + ")");
 			// Advances statistics => expensive --------------
 			if (BasicTypeInfo.STRING_TYPE_INFO.equals(colType)) {
 				columnStats = computeAdvancedStringStats(columnStats, colIndex, columnData);
@@ -111,7 +115,7 @@ public class ProfileJob {
 
 		final String collectAccId = new AbstractID().toString();
 		final TypeSerializer<StatsPojo> serializer = columnStatDs.getType().createSerializer(env.getConfig());
-		columnStatDs.output(new Utils.CollectHelper<>(collectAccId, serializer)).name("collect()");
+		columnStatDs.output(new Utils.CollectHelper<>(collectAccId, serializer)).name("collectStats()");
 		JobExecutionResult jobRes = env.execute();
 
 		final List<StatsPojo> colStats = deserializeCollectedStatsPojo(collectAccId, serializer, jobRes);
@@ -145,7 +149,8 @@ public class ProfileJob {
 	private static DataSet<StatsPojo> computeAdvancedStringStats(DataSet<StatsPojo> columnStats, final int colIndex,
 			final DataSet<Row> columnData) {
 		final DataSet<StringStatsTuple> stringStats = //
-				columnData.map(row -> new StringStatsTuple(colIndex, (String) row.getField(0)));
+				columnData.map(row -> new StringStatsTuple(colIndex, (String) row.getField(0)))
+						.name("statsPojo => stringStatsTuple");
 		// TOP K values
 		final DataSet<Tuple2<String, Long>> valuePairs = stringStats//
 				.project(StringStatsTuple.STRING_VALUE_POS, StringStatsTuple.COUNTER_POS);

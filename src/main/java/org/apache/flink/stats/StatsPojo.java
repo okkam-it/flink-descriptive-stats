@@ -67,16 +67,24 @@ public class StatsPojo implements Serializable {
 		return unormalizedVariance / numericValues;
 	}
 
-	public Double getStdDevPopulation() {
-		return Math.sqrt(getVariancePopulation());
-	}
-
 	public double getVarianceSample() {
 		return unormalizedVariance / (numericValues - 1);
 	}
 
+	public double getVarianceSampleStdError() {
+		return getVarianceSample() * Math.sqrt(2.0 / (numericValues - 1.0));
+	}
+
+	public Double getStdDevPopulation() {
+		return Math.sqrt(getVariancePopulation());
+	}
+
 	public Double getStdDevSample() {
 		return Math.sqrt(getVarianceSample());
+	}
+
+	public double getStdDevSampleStdError() {
+		return getStdDevSample() * (1.0 / Math.sqrt(2.0 * (numericValues - 1)));
 	}
 
 	public Double getMean() {
@@ -95,12 +103,22 @@ public class StatsPojo implements Serializable {
 		return skew * Math.sqrt(numericValues - 1.0) / Math.pow(unormalizedVariance, 3.0 / 2.0);
 	}
 
+	public Double getSampleSkewnessStdError() {
+		return Math.sqrt((6.0 * numericValues * (numericValues - 1.0))
+				/ ((numericValues - 2.0) * (numericValues + 1.0) * (numericValues + 3.0)));
+	}
+
 	public Double getPopulationKurtosis() {
 		return (kurtosis * numericValues) / Math.pow(unormalizedVariance, 2.0);
 	}
 
 	public Double getSampleKurtosis() {
 		return (kurtosis * (numericValues - 1.0)) / Math.pow(unormalizedVariance, 2.0);
+	}
+
+	public Double getSampleKurtosisStdError() {
+		return 2.0 * getSampleSkewnessStdError()
+				* Math.sqrt((Math.pow(numericValues, 2.0) - 1.0) / ((numericValues - 3.0) * (numericValues + 5.0)));
 	}
 
 	public Double getExcessPopulationKurtosis() {
@@ -302,7 +320,9 @@ public class StatsPojo implements Serializable {
 		ret.append(String.format("%nVariance (population): %.3f", getVariancePopulation()));
 		ret.append(String.format("%nStdDev (population): %.3f", getStdDevPopulation()));
 		ret.append(String.format("%nVariance (sample): %.3f", getVarianceSample()));
+		ret.append(String.format("%nVariance error (sample): %.3f", getVarianceSampleStdError()));
 		ret.append(String.format("%nStdDev (sample): %.3f", getStdDevSample()));
+		ret.append(String.format("%nStdDev error (sample) : %.3f", getStdDevSampleStdError()));
 		ret.append("\nMin: " + getMin());
 		ret.append("\nMax: " + getMax());
 		ret.append("\nMinLength: " + getMinLength());
@@ -310,8 +330,10 @@ public class StatsPojo implements Serializable {
 		ret.append(String.format("%nAvgLength: %.3f", getAvgLength()));
 		ret.append(String.format("%nSkewness (population): %.3f", getPopulationSkewness()));
 		ret.append(String.format("%nSkewness (sample): %.3f", getSampleSkewness()));
+		ret.append(String.format("%nSkewness error (sample): %.3f", getSampleSkewnessStdError()));
 		ret.append(String.format("%nKurtosis (population): %.3f", getPopulationKurtosis()));
 		ret.append(String.format("%nKurtosis (sample): %.3f", getSampleKurtosis()));
+		ret.append(String.format("%nKurtosis error (sample): %.3f", getSampleKurtosisStdError()));
 
 		// if excess == 0 --> Mesokurtic distibution: Normal and Binomial distributions
 		// if excess > 0 --> Leptokurtik distibution (aka super-Gaussian distributions):
@@ -354,11 +376,13 @@ public class StatsPojo implements Serializable {
 	 * @return the reduced version of this tuple.
 	 */
 	public StatsPojo reduce(StatsPojo other) {
+		// variance vars
 		final double s1 = getUnormalizedVariance();
 		final double s2 = other.getUnormalizedVariance();
 		final long m = getNumericValues();
 		final long n = other.getNumericValues();
 		final long nPlusM = n + m;
+		final long nTimesM = n * m;
 		final double t1 = getSum();
 		final double t2 = other.getSum();
 		// skewness vars
@@ -374,16 +398,16 @@ public class StatsPojo implements Serializable {
 		} else {
 
 			// Philippe Pebay version
-			setUnormalizedVariance(s1 + s2 + (Math.pow(delta, 2.0) * (n * m)) / nPlusM);
+			setUnormalizedVariance(s1 + s2 + (Math.pow(delta, 2.0) * nTimesM) / nPlusM);
 			/// Test Pairwise version
 			// setUnormalizedVariance(s1 + s2 + (((double) m / (n * nPlusM)) * Math.pow(((
 			/// (double) n / m) * t1) - t2, 2.0)));
 			setSkew(skew1 + skew2 + //
-					(Math.pow(delta, 3.0) * (n * m) * (m - n) / Math.pow(nPlusM, 2.0)) + //
+					(Math.pow(delta, 3.0) * nTimesM * (m - n) / Math.pow(nPlusM, 2.0)) + //
 					(3 * delta * (m * s2 - n * s1) / nPlusM) //
 			);
 			setKurtosis(kurt1 + kurt2 + //
-					(Math.pow(delta, 4.0) * (n * m) * (Math.pow(m, 2.0) - (n * m) + Math.pow(n, 2.0))
+					(Math.pow(delta, 4.0) * nTimesM * (Math.pow(m, 2.0) - nTimesM + Math.pow(n, 2.0))
 							/ Math.pow(nPlusM, 3.0))
 					+ (6.0 * Math.pow(delta, 2.0) * ((Math.pow(m, 2.0) * s2) + (Math.pow(n, 2.0) * s1))
 							/ Math.pow(nPlusM, 2.0))
