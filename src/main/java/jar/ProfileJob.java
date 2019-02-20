@@ -34,6 +34,8 @@ import org.apache.flink.util.Collector;
 // - (Ahn, Fessler) http://web.eecs.umich.edu/~fessler/papers/files/tr/stderr.pdf
 //Skew and kurtosis: 
 // - (Stuart McCrary) https://www.thinkbrg.com/media/publication/720_720_McCrary_ImplementingAlgorithms_Whitepaper_20151119_WEB.pdf
+// Jarque Bera score:
+// - http://academicos.fciencias.unam.mx/wp-content/uploads/sites/91/2015/04/jarque_bera_87.pdf
 public class ProfileJob {
 
 	private static final int TOP_SIZE = 20;
