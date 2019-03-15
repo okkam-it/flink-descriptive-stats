@@ -40,14 +40,15 @@ public class ProfileJob {
 
 	private static final int TOP_SIZE = 20;
 	private static final String[] COLUMN_NAMES = new String[] { "col1", "col2", "col3" };
-	private static final int NUM_ELEMENTS = 10;
+	private static final int NUM_ELEMENTS = 100_000;
 
 	private static Row[] getRowArray(int size) {
 		Random rand = new Random(0);
 		Row[] ret = new Row[size];
 		for (int i = 0; i < size; i++) {
 //			if (i % 3 == 0) {
-			ret[i] = Row.of(true, "3", rand.nextGaussian());
+//				ret[i] = Row.of(true, "" + i, 5000);
+			ret[i] = Row.of(true, "3", rand.nextGaussian() * 100);
 //				ret[i] = Row.of(true, "3", 1);
 //			} else if (i % 7 == 0) {
 //				ret[i] = Row.of(true, "7", 1);
@@ -130,8 +131,27 @@ public class ProfileJob {
 		for (int i = 0; i < colStats.size(); i++) {
 			final StatsPojo columnStat = colStats.get(i);
 			System.out.println(columnStat.toString(COLUMN_NAMES[i], TOP_SIZE));
+			estimateHistogramWidth(i, columnStat);
 		}
 
+	}
+
+	// http://biocurious.com/files/histo-bin-size-scott.pdf
+	private static void estimateHistogramWidth(int i, final StatsPojo columnStat) {
+		double stdDevPop = columnStat.getPopulationStdDev();
+		long rowSize = columnStat.getRowCount();
+		double binWidth = Math.floor(3.49 * stdDevPop * Math.pow(rowSize, -1.0 / 3));
+		double skewness = Math.ceil(columnStat.getPopulationSkewness());
+		if (skewness == 1) {
+			binWidth *= 0.4;
+		} else if (skewness == 2) {
+			binWidth *= 0.6;
+		} else if (skewness == 3) {
+			binWidth *= 0.7;
+		} else if (skewness > 3) {
+			System.out.println("Estimation of binWidth is not reliable..");
+		}
+		System.out.println("===================== BinWidth for column " + COLUMN_NAMES[i] + " = " + binWidth);
 	}
 
 	private static List<StatsPojo> deserializeCollectedStatsPojo(final String id,

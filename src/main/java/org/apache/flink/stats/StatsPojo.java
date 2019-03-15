@@ -87,7 +87,7 @@ public class StatsPojo implements Serializable {
 		return getSampleStdDev() * (1.0 / Math.sqrt(2.0 * (numericValues - 1)));
 	}
 
-	public Double getMean() {
+	public Double getAvg() {
 		return sum / numericValues;
 	}
 
@@ -332,7 +332,7 @@ public class StatsPojo implements Serializable {
 		if (numericValues > 0) {
 			ret.append("\nMin: " + getMin());
 			ret.append("\nMax: " + getMax());
-			ret.append(String.format("%nMean: %.3f", getMean()));
+			ret.append(String.format("%nMean: %.3f", getAvg()));
 			ret.append(String.format("%nMean square error (MSE): %.3f", getMeanSquareError()));
 			ret.append(String.format("%nVariance (population): %.3f", getPopulationVariance()));
 			ret.append(String.format("%nStdDev (population): %.3f", getPopulationStdDev()));
