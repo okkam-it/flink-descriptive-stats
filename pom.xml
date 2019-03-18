@@ -1,22 +1,15 @@
-<!--
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
--->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<!-- Licensed to the Apache Software Foundation (ASF) under one or more contributor 
+	license agreements. See the NOTICE file distributed with this work for additional 
+	information regarding copyright ownership. The ASF licenses this file to 
+	you under the Apache License, Version 2.0 (the "License"); you may not use 
+	this file except in compliance with the License. You may obtain a copy of 
+	the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required 
+	by applicable law or agreed to in writing, software distributed under the 
+	License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS 
+	OF ANY KIND, either express or implied. See the License for the specific 
+	language governing permissions and limitations under the License. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
@@ -52,7 +45,8 @@ under the License.
 
 	<dependencies>
 		<!-- Apache Flink dependencies -->
-		<!-- These dependencies are provided, because they should not be packaged into the JAR file. -->
+		<!-- These dependencies are provided, because they should not be packaged 
+			into the JAR file. -->
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-java</artifactId>
@@ -78,19 +72,15 @@ under the License.
 			<version>${flink.version}</version>
 			<scope>provided</scope>
 		</dependency>
-		
-		<!-- Add connector dependencies here. They must be in the default scope (compile). -->
 
-		<!-- Example:
+		<!-- Add connector dependencies here. They must be in the default scope 
+			(compile). -->
 
-		<dependency>
-			<groupId>org.apache.flink</groupId>
-			<artifactId>flink-connector-kafka-0.10_${scala.binary.version}</artifactId>
-			<version>${flink.version}</version>
-		</dependency>
-		-->
+		<!-- Example: <dependency> <groupId>org.apache.flink</groupId> <artifactId>flink-connector-kafka-0.10_${scala.binary.version}</artifactId> 
+			<version>${flink.version}</version> </dependency> -->
 
-		<!-- Add logging framework, to produce console output when running in the IDE. -->
+		<!-- Add logging framework, to produce console output when running in the 
+			IDE. -->
 		<!-- These dependencies are excluded from the application JAR by default. -->
 		<dependency>
 			<groupId>org.slf4j</groupId>
@@ -119,9 +109,41 @@ under the License.
 					<target>${java.version}</target>
 				</configuration>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-checkstyle-plugin</artifactId>
+				<version>2.17</version>
+				<dependencies>
+					<dependency>
+						<groupId>com.puppycrawl.tools</groupId>
+						<artifactId>checkstyle</artifactId>
+						<version>8.6</version>
+					</dependency>
+				</dependencies>
+				<executions>
+					<execution>
+						<id>validate</id>
+						<phase>validate</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<configLocation>google_checks.xml</configLocation>
+					<encoding>UTF-8</encoding>
+					<consoleOutput>true</consoleOutput>
+					<failsOnError>true</failsOnError>
+					<linkXRef>false</linkXRef>
+					<violationSeverity>warning</violationSeverity>
+					<excludes>com/twitter/**,org/apache/flink/**</excludes>
+				</configuration>
+			</plugin>
 
-			<!-- We use the maven-shade plugin to create a fat jar that contains all necessary dependencies. -->
-			<!-- Change the value of <mainClass>...</mainClass> if your program entry point changes. -->
+			<!-- We use the maven-shade plugin to create a fat jar that contains all 
+				necessary dependencies. -->
+			<!-- Change the value of <mainClass>...</mainClass> if your program entry 
+				point changes. -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
@@ -144,8 +166,8 @@ under the License.
 							</artifactSet>
 							<filters>
 								<filter>
-									<!-- Do not copy the signatures in the META-INF folder.
-									Otherwise, this might cause SecurityExceptions when using the JAR. -->
+									<!-- Do not copy the signatures in the META-INF folder. Otherwise, 
+										this might cause SecurityExceptions when using the JAR. -->
 									<artifact>*:*</artifact>
 									<excludes>
 										<exclude>META-INF/*.SF</exclude>
@@ -155,7 +177,8 @@ under the License.
 								</filter>
 							</filters>
 							<transformers>
-								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
 									<mainClass>jar.ProfileJob</mainClass>
 								</transformer>
 							</transformers>
@@ -165,50 +188,51 @@ under the License.
 			</plugin>
 		</plugins>
 
-<!-- 		<pluginManagement> -->
-<!-- 			<plugins> -->
+		<!-- <pluginManagement> -->
+		<!-- <plugins> -->
 
-<!-- 				This improves the out-of-the-box experience in Eclipse by resolving some warnings. -->
-<!-- 				<plugin> -->
-<!-- 					<groupId>org.eclipse.m2e</groupId> -->
-<!-- 					<artifactId>lifecycle-mapping</artifactId> -->
-<!-- 					<version>1.0.0</version> -->
-<!-- 					<configuration> -->
-<!-- 						<lifecycleMappingMetadata> -->
-<!-- 							<pluginExecutions> -->
-<!-- 								<pluginExecution> -->
-<!-- 									<pluginExecutionFilter> -->
-<!-- 										<groupId>org.apache.maven.plugins</groupId> -->
-<!-- 										<artifactId>maven-shade-plugin</artifactId> -->
-<!-- 										<versionRange>[3.0.0,)</versionRange> -->
-<!-- 										<goals> -->
-<!-- 											<goal>shade</goal> -->
-<!-- 										</goals> -->
-<!-- 									</pluginExecutionFilter> -->
-<!-- 									<action> -->
-<!-- 										<ignore/> -->
-<!-- 									</action> -->
-<!-- 								</pluginExecution> -->
-<!-- 								<pluginExecution> -->
-<!-- 									<pluginExecutionFilter> -->
-<!-- 										<groupId>org.apache.maven.plugins</groupId> -->
-<!-- 										<artifactId>maven-compiler-plugin</artifactId> -->
-<!-- 										<versionRange>[3.1,)</versionRange> -->
-<!-- 										<goals> -->
-<!-- 											<goal>testCompile</goal> -->
-<!-- 											<goal>compile</goal> -->
-<!-- 										</goals> -->
-<!-- 									</pluginExecutionFilter> -->
-<!-- 									<action> -->
-<!-- 										<ignore/> -->
-<!-- 									</action> -->
-<!-- 								</pluginExecution> -->
-<!-- 							</pluginExecutions> -->
-<!-- 						</lifecycleMappingMetadata> -->
-<!-- 					</configuration> -->
-<!-- 				</plugin> -->
-<!-- 			</plugins> -->
-<!-- 		</pluginManagement> -->
+		<!-- This improves the out-of-the-box experience in Eclipse by resolving 
+			some warnings. -->
+		<!-- <plugin> -->
+		<!-- <groupId>org.eclipse.m2e</groupId> -->
+		<!-- <artifactId>lifecycle-mapping</artifactId> -->
+		<!-- <version>1.0.0</version> -->
+		<!-- <configuration> -->
+		<!-- <lifecycleMappingMetadata> -->
+		<!-- <pluginExecutions> -->
+		<!-- <pluginExecution> -->
+		<!-- <pluginExecutionFilter> -->
+		<!-- <groupId>org.apache.maven.plugins</groupId> -->
+		<!-- <artifactId>maven-shade-plugin</artifactId> -->
+		<!-- <versionRange>[3.0.0,)</versionRange> -->
+		<!-- <goals> -->
+		<!-- <goal>shade</goal> -->
+		<!-- </goals> -->
+		<!-- </pluginExecutionFilter> -->
+		<!-- <action> -->
+		<!-- <ignore/> -->
+		<!-- </action> -->
+		<!-- </pluginExecution> -->
+		<!-- <pluginExecution> -->
+		<!-- <pluginExecutionFilter> -->
+		<!-- <groupId>org.apache.maven.plugins</groupId> -->
+		<!-- <artifactId>maven-compiler-plugin</artifactId> -->
+		<!-- <versionRange>[3.1,)</versionRange> -->
+		<!-- <goals> -->
+		<!-- <goal>testCompile</goal> -->
+		<!-- <goal>compile</goal> -->
+		<!-- </goals> -->
+		<!-- </pluginExecutionFilter> -->
+		<!-- <action> -->
+		<!-- <ignore/> -->
+		<!-- </action> -->
+		<!-- </pluginExecution> -->
+		<!-- </pluginExecutions> -->
+		<!-- </lifecycleMappingMetadata> -->
+		<!-- </configuration> -->
+		<!-- </plugin> -->
+		<!-- </plugins> -->
+		<!-- </pluginManagement> -->
 	</build>
 
 	<!-- This profile helps to make things run out of the box in IntelliJ -->
