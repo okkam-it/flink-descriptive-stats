@@ -2,6 +2,7 @@ package jar;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.flink.api.common.JobExecutionResult;
@@ -41,25 +42,25 @@ public class ProfileJob {
   private static final int NUM_ELEMENTS = 100_000;
 
   private static Row[] getRowArray(int size) {
-    java.util.Random rand = new java.util.Random(0);
-    Row[] ret = new Row[size];
-    for (int i = 0; i < size; i++) {
-      ret[i] = Row.of(true, "3", rand.nextGaussian() * 100);
-    }
-
+    // java.util.Random rand = new java.util.Random(0);
     // Row[] ret = new Row[size];
     // for (int i = 0; i < size; i++) {
-    // if (i % 3 == 0) {
-    // ret[i] = Row.of(true, "" + i, 5000);
-    // ret[i] = Row.of(true, "3", 1);
-    // } else if (i % 7 == 0) {
-    // ret[i] = Row.of(true, "7", 1);
-    // } else if (i % 11 == 0) {
-    // ret[i] = Row.of(null, "ABCDEF00X30A333Y", i);
-    // } else {
-    // ret[i] = Row.of(true, "" + i, i);
+    // ret[i] = Row.of(true, "3", rand.nextGaussian() * 100);
     // }
-    // }
+
+    Row[] ret = new Row[size];
+    for (int i = 0; i < size; i++) {
+      if (i % 3 == 0) {
+        // ret[i] = Row.of(true, "" + i, 5000);
+        ret[i] = Row.of(true, "3", 1);
+      } else if (i % 7 == 0) {
+        ret[i] = Row.of(true, "7", 1);
+      } else if (i % 11 == 0) {
+        ret[i] = Row.of(null, "ABCDEF00X30A333Y", i);
+      } else {
+        ret[i] = Row.of(true, "" + i, i);
+      }
+    }
     return ret;
   }
 
@@ -167,6 +168,7 @@ public class ProfileJob {
     if (accResult != null) {
       try {
         columnStatList = SerializedListAccumulator.deserializeList(accResult, serializer);
+        Collections.sort(columnStatList);
       } catch (ClassNotFoundException e) {
         throw new RuntimeException("Cannot find type class of collected data type.", e);
       } catch (IOException e) {
@@ -180,9 +182,10 @@ public class ProfileJob {
 
   private static DataSet<StatsPojo> computeAdvancedStringStats(DataSet<StatsPojo> columnStats,
       final int colIndex, final DataSet<Row> columnData) {
-    final DataSet<StringStatsTuple> stringStats = //
-        columnData.map(row -> new StringStatsTuple(colIndex, (String) row.getField(0)))
-            .name("statsPojo => stringStatsTuple");
+    final DataSet<StringStatsTuple> stringStats = columnData //
+        .filter(row -> row.getField(0) != null) // remove null values
+        .map(row -> new StringStatsTuple(colIndex, (String) row.getField(0))) //
+        .name("statsPojo => stringStatsTuple");
     // TOP K values
     final DataSet<Tuple2<String, Long>> valuePairs = stringStats//
         .project(StringStatsTuple.STRING_VALUE_POS, StringStatsTuple.COUNTER_POS);

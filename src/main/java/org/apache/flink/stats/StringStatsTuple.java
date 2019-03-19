@@ -12,7 +12,9 @@ public class StringStatsTuple extends Tuple4<Integer, String, String, Long> {
   public static final int COUNTER_POS = 3;
 
   @Deprecated
+  @SuppressWarnings({ "squid:MissingDeprecatedCheck", "squid:S1133" })
   public StringStatsTuple() {
+    // required by Flink
   }
 
   public StringStatsTuple(int colIndex, String value) {
@@ -42,84 +44,6 @@ public class StringStatsTuple extends Tuple4<Integer, String, String, Long> {
     }
     return ret.toString();
   }
-
-  // /**
-  // * Convert to regex.
-  // *
-  // * @param value
-  // * value to convert
-  // * @return regex expression
-  // */
-  // public static String convertToRegex(String value) {
-  // StringBuilder ret = new StringBuilder();
-  // int prev = 0;
-  // int minus = 0;
-  // for (int i = 0; i < value.length(); i++) {
-  // String currentPatt = String.valueOf(value.charAt(i));
-  // if (prev == 0) {
-  // ret.append(currentPatt);
-  // ret.append("1");
-  // } else {
-  // if (currentPatt.equals(String.valueOf(ret.charAt(ret.length() - 2 - minus))))
-  // {
-  // int now = Integer.parseInt(String.valueOf(ret.charAt(ret.length() - 1)));
-  // String newBuilder = ret.substring(0, ret.length() - 1);
-  // if (minus == 1) {
-  // now = Integer.parseInt(String.valueOf(ret.charAt(ret.length() - 1)))
-  // + 10 * Integer.parseInt(String.valueOf(ret.charAt(ret.length() - 2)));
-  // newBuilder = ret.substring(0, ret.length() - 2);
-  // }
-  // ret = new StringBuilder(newBuilder);
-  // ret.append(String.valueOf(now + 1));
-  // if (now + 1 >= 10) {
-  // minus = 1;
-  // } else {
-  // minus = 0;
-  // }
-  // } else {
-  // minus = 0;
-  // ret.append(currentPatt);
-  // ret.append("1");
-  // }
-  // }
-  // prev = 1;
-  // }
-  //
-  // StringBuilder next = new StringBuilder();
-  //
-  // for (int i = 0; i < ret.toString().length(); i += 2) {
-  // if (ret.toString().charAt(i) == 'a') {
-  // next.append("[a-z]");
-  // } else if (ret.toString().charAt(i) == 'A') {
-  // next.append("[A-Z]");
-  // } else if (ret.toString().charAt(i) == '#') {
-  // next.append("[0-9]");
-  // } else if (ret.toString().charAt(i) == '?') {
-  // next.append("[?]");
-  // } else if (ret.toString().charAt(i) == 'b') {
-  // next.append("[ ]");
-  // } else {
-  // next.append(ret.toString().charAt(i));
-  // }
-  // int n = 0;
-  // for (int j = i + 1; j < ret.toString().length(); j++) {
-  // if (ret.toString().charAt(j) <= '9' && ret.toString().charAt(j) >= '0') {
-  // n++;
-  // } else {
-  // break;
-  // }
-  // }
-  // if (n == 1) {
-  // next.append("{" + ret.toString().charAt(i + 1) + "}");
-  // } else if (n == 2) {
-  // int x = 10 * Integer.parseInt(String.valueOf(ret.toString().charAt(i + 1)))
-  // + Integer.parseInt(String.valueOf(ret.toString().charAt(i + 2)));
-  // next.append("{" + x + "}");
-  // i++;
-  // }
-  // }
-  // return next.toString();
-  // }
 
   // GETTERS and SETTERS
   public Integer getColumnIndex() {

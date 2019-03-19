@@ -10,7 +10,7 @@ import java.util.Map;
 import org.apache.commons.lang3.time.DateUtils;
 import org.apache.flink.api.java.tuple.Tuple2;
 
-public class StatsPojo implements Serializable {
+public class StatsPojo implements Serializable, Comparable<StatsPojo> {
 
   private static final long serialVersionUID = 1L;
 
@@ -24,7 +24,7 @@ public class StatsPojo implements Serializable {
   private long numericValues;
   private long nullValues;
   private long emptyString;
-  private Double avg = Double.NaN;
+  private Double avg = Double.NaN;// use bigdecimal to be more precise
   private Double min = Double.NaN;
   private Double max = Double.NaN;
 
@@ -32,12 +32,12 @@ public class StatsPojo implements Serializable {
   private double unormalizedVariance;// un-normalized variance
   private double skew;
   private double kurtosis;
-  private Map<String, Long> topValues;// only if statsType == TYPE_WORD
-  private Map<String, Long> topPatterns;// only if statsType == TYPE_PATTERN
+  private Map<String, Integer> topValues;// only if statsType == TYPE_WORD
+  private Map<String, Integer> topPatterns;// only if statsType == TYPE_PATTERN
 
-  private long minLength;
-  private long maxLength;
-  private long sumLength;
+  private Integer minLength;
+  private Integer maxLength;
+  private Double avgLength;// use bigdecimal to be more precise
 
   // possible types for string fields
   private long booleanValues;
@@ -76,18 +76,98 @@ public class StatsPojo implements Serializable {
     final Double doubleVal = CastUtils.getDoubleVal(val);
     if (doubleVal != null) {
       this.numericValues++;
-      this.min = min.isNaN() ? doubleVal : Math.min(min, doubleVal);
-      this.max = max.isNaN() ? doubleVal : Math.max(max, doubleVal);
+      this.min = doubleVal;
+      this.max = doubleVal;
       this.avg = doubleVal;
     }
-    long valLength = getValLength(val);
-    this.minLength = Math.min(minLength, valLength);
-    this.maxLength = Math.max(maxLength, valLength);
-    this.sumLength += valLength;
+    final Integer valLength = getValLength(val);
+    if (valLength != null) {
+      this.minLength = valLength;
+      this.maxLength = valLength;
+      this.avgLength = valLength.doubleValue();
+    }
     if (val instanceof String && ((String) val).trim().isEmpty()) {
       this.emptyString++;
     }
     return doubleVal;
+  }
+
+  /**
+   * Reduce this and another StatsPojo.
+   * 
+   * @param other the other StatsPojo
+   * @return the reduced version of this tuple.
+   */
+  public StatsPojo reduce(StatsPojo other) {
+    // variance vars
+    final double s1 = getUnormalizedVariance();
+    final double s2 = other.getUnormalizedVariance();
+    final long m = getNumericValues();
+    final long n = other.getNumericValues();
+    final long nPlusM = n + m;
+    final long nTimesM = n * m;
+    final double u1 = getAvg().isNaN() ? 0.0 : getAvg();
+    final double u2 = other.getAvg().isNaN() ? 0.0 : other.getAvg();
+    // skewness vars
+    final double skew1 = getSkew();
+    final double skew2 = other.getSkew();
+    final double delta = u2 - u1;
+    // kurtosis vars
+    final double kurt1 = getKurtosis();
+    final double kurt2 = other.getKurtosis();
+
+    if (nPlusM == 0L) {
+      setUnormalizedVariance(other.getNumericValues() == 0L ? s1 : s2);
+    } else {
+
+      // Philippe Pebay version
+      setUnormalizedVariance(s1 + s2 + (Math.pow(delta, 2.0) * nTimesM) / nPlusM);
+      /// Test Pairwise version
+      // setUnormalizedVariance(s1 + s2 + (((double) m / (n * nPlusM)) * Math.pow(((
+      /// (double) n / m) * t1) - t2, 2.0)));
+      setSkew(skew1 + skew2 + //
+          (Math.pow(delta, 3.0) * nTimesM * (m - n) / Math.pow(nPlusM, 2.0)) + //
+          (3 * delta * (m * s2 - n * s1) / nPlusM) //
+      );
+      setKurtosis(kurt1 + kurt2 + //
+          (Math.pow(delta, 4.0) * nTimesM * (Math.pow(m, 2.0) - nTimesM + Math.pow(n, 2.0))
+              / Math.pow(nPlusM, 3.0))
+          + (6.0 * Math.pow(delta, 2.0) * ((Math.pow(m, 2.0) * s2) + (Math.pow(n, 2.0) * s1))
+              / Math.pow(nPlusM, 2.0))
+          + (4.0 * delta * ((m * skew2) - (n * skew1)) / nPlusM));
+
+      setMin(getMin().isNaN() ? other.getMin() : getMin2(getMin(), other.getMin()));
+      setMax(getMax().isNaN() ? other.getMax() : getMax2(getMax(), other.getMax()));
+
+      if (getAvg().isNaN() || other.getAvg().isNaN()) {
+        setAvg(getAvg().isNaN() ? other.getAvg() : getAvg());
+      } else {
+        setAvg(u1 + n * (delta) / (nPlusM));
+      }
+    }
+    setRowCount(getRowCount() + other.getRowCount());
+    setNumericValues(nPlusM);
+    setNullValues(getNullValues() + other.getNullValues());
+    setEmptyString(getEmptyString() + other.getEmptyString());
+
+    updateLengthStats(other);
+    return this;
+  }
+
+  private void updateLengthStats(StatsPojo other) {
+    if (getAvgLength() != null && other.getAvgLength() != null) {
+      // both are not null
+      final Double ul1 = getAvgLength();
+      final Double ul2 = other.getAvgLength();
+      final long nPlusM2 = other.getNonNullValues() + getNonNullValues();
+      setMinLength(Math.min(getMinLength(), other.getMinLength()));
+      setMaxLength(Math.max(getMaxLength(), other.getMaxLength()));
+      setAvgLength(ul1 + other.getNonNullValues() * (ul2 - ul1) / nPlusM2);
+    } else {
+      setMinLength(getMinLength() != null ? getMinLength() : other.getMinLength());
+      setMaxLength(getMaxLength() != null ? getMaxLength() : other.getMaxLength());
+      setAvgLength(getAvgLength() != null ? getAvgLength() : other.getAvgLength());
+    }
   }
 
   public double getPopulationVariance() {
@@ -118,7 +198,7 @@ public class StatsPojo implements Serializable {
     return avg;
   }
 
-  private void setAvg(double avg) {
+  private void setAvg(Double avg) {
     this.avg = avg;
   }
 
@@ -126,12 +206,28 @@ public class StatsPojo implements Serializable {
     return getSampleStdDev() / Math.sqrt(numericValues);
   }
 
+  /**
+   * Returns the population skewness.
+   * 
+   * @return the population skewness.
+   */
   public Double getPopulationSkewness() {
+    if (unormalizedVariance == 0.0) {
+      return 0.0;
+    }
     return skew * Math.sqrt(numericValues) / Math.pow(unormalizedVariance, 3.0 / 2.0);
   }
 
+  /**
+   * Returns the sample skewness.
+   * 
+   * @return the sample skewness.
+   */
   public Double getSampleSkewness() {
-    return skew * Math.sqrt(numericValues - 1.0) / Math.pow(unormalizedVariance, 3.0 / 2.0);
+    if (numericValues <= 1.0) {
+      return 0.0;
+    }
+    return getPopulationSkewness() * numericValues / (numericValues - 1);
   }
 
   public Double getSampleSkewnessStdError() {
@@ -139,12 +235,28 @@ public class StatsPojo implements Serializable {
         / ((numericValues - 2.0) * (numericValues + 1.0) * (numericValues + 3.0)));
   }
 
+  /**
+   * Returns the population kurtosis.
+   * 
+   * @return the population kurtosis.
+   */
   public Double getPopulationKurtosis() {
+    if (unormalizedVariance == 0.0) {
+      return 0.0;
+    }
     return (kurtosis * numericValues) / Math.pow(unormalizedVariance, 2.0);
   }
 
+  /**
+   * Returns the sample kurtosis.
+   * 
+   * @return the sample kurtosis.
+   */
   public Double getSampleKurtosis() {
-    return (kurtosis * (numericValues - 1.0)) / Math.pow(unormalizedVariance, 2.0);
+    if (numericValues <= 1.0) {
+      return 0.0;
+    }
+    return getPopulationKurtosis() * numericValues / (numericValues - 1);
   }
 
   public Double getSampleKurtosisStdError() {
@@ -161,9 +273,9 @@ public class StatsPojo implements Serializable {
   }
 
   /**
-   * Returns the Jarque-Bera score.
+   * Returns the Jarque Bera score.
    * 
-   * @return the Jarque-Bera score
+   * @return the Jarque Bera score
    */
   public Double getSampleJarqueBeraScore() {
     if (numericValues == 0) {
@@ -180,10 +292,11 @@ public class StatsPojo implements Serializable {
    * @return the average length
    */
   public Double getAvgLength() {
-    if (getNonNullValues() == 0) {
-      return 0.0;
-    }
-    return (double) sumLength / getNonNullValues();
+    return avgLength;
+  }
+
+  private void setAvgLength(Double avgLength) {
+    this.avgLength = avgLength;
   }
 
   private long getNonNullValues() {
@@ -287,9 +400,9 @@ public class StatsPojo implements Serializable {
   }
 
   // from calcite SqlFunctions.java
-  private long getValLength(Object val) {
-    if (val == null) {
-      return 0;
+  private Integer getValLength(Object val) {
+    if (val == null || val instanceof java.sql.Date) {
+      return null;
     }
     if (val instanceof Character) {
       return 1;
@@ -431,67 +544,6 @@ public class StatsPojo implements Serializable {
         jarqueBeraScore > threshold ? "REJECTED" : "ACCEPTED");
   }
 
-  /**
-   * Reduce this and another StatsPojo.
-   * 
-   * @param other the other StatsPojo
-   * @return the reduced version of this tuple.
-   */
-  public StatsPojo reduce(StatsPojo other) {
-    // variance vars
-    final double s1 = getUnormalizedVariance();
-    final double s2 = other.getUnormalizedVariance();
-    final long m = getNumericValues();
-    final long n = other.getNumericValues();
-    final long nPlusM = n + m;
-    final long nTimesM = n * m;
-    // final double t1 = getSum();
-    // final double t2 = other.getSum();
-    final double u1 = getAvg();
-    final double u2 = other.getAvg();
-    // skewness vars
-    final double skew1 = getSkew();
-    final double skew2 = other.getSkew();
-    // final double delta = (t2 / n) - (t1 / m);
-    final double delta = u2 - u1;
-    // kurtosis vars
-    final double kurt1 = getKurtosis();
-    final double kurt2 = other.getKurtosis();
-
-    if (getNumericValues() == 0L || other.getNumericValues() == 0L) {
-      setUnormalizedVariance(other.getNumericValues() == 0L ? s1 : s2);
-    } else {
-
-      // Philippe Pebay version
-      setUnormalizedVariance(s1 + s2 + (Math.pow(delta, 2.0) * nTimesM) / nPlusM);
-      /// Test Pairwise version
-      // setUnormalizedVariance(s1 + s2 + (((double) m / (n * nPlusM)) * Math.pow(((
-      /// (double) n / m) * t1) - t2, 2.0)));
-      setSkew(skew1 + skew2 + //
-          (Math.pow(delta, 3.0) * nTimesM * (m - n) / Math.pow(nPlusM, 2.0)) + //
-          (3 * delta * (m * s2 - n * s1) / nPlusM) //
-      );
-      setKurtosis(kurt1 + kurt2 + //
-          (Math.pow(delta, 4.0) * nTimesM * (Math.pow(m, 2.0) - nTimesM + Math.pow(n, 2.0))
-              / Math.pow(nPlusM, 3.0))
-          + (6.0 * Math.pow(delta, 2.0) * ((Math.pow(m, 2.0) * s2) + (Math.pow(n, 2.0) * s1))
-              / Math.pow(nPlusM, 2.0))
-          + (4.0 * delta * ((m * skew2) - (n * skew1)) / nPlusM));
-    }
-    setRowCount(getRowCount() + other.getRowCount());
-    setNumericValues(nPlusM);
-    setNullValues(getNullValues() + other.getNullValues());
-    setEmptyString(getEmptyString() + other.getEmptyString());
-    setAvg(u1 + n * (u2 - u1) / (nPlusM));
-    // setSum(t1 + t2);
-    setMin(getMin().isNaN() ? other.getMin() : getMin2(getMin(), other.getMin()));
-    setMax(getMax().isNaN() ? other.getMax() : getMax2(getMax(), other.getMax()));
-    setMinLength(Math.min(getMinLength(), other.getMinLength()));
-    setMaxLength(Math.max(getMaxLength(), other.getMaxLength()));
-    setSumLength(getSumLength() + other.getSumLength());
-    return this;
-  }
-
   private double getMax2(Double currentMax, Double possibleMax) {
     return possibleMax.isNaN() ? currentMax : Math.max(currentMax, possibleMax);
   }
@@ -546,30 +598,21 @@ public class StatsPojo implements Serializable {
     return this;
   }
 
-  public long getMinLength() {
+  public Integer getMinLength() {
     return minLength;
   }
 
-  public StatsPojo setMinLength(long minLength) {
+  public StatsPojo setMinLength(Integer minLength) {
     this.minLength = minLength;
     return this;
   }
 
-  public long getMaxLength() {
+  public Integer getMaxLength() {
     return maxLength;
   }
 
-  public StatsPojo setMaxLength(long maxLength) {
+  public StatsPojo setMaxLength(Integer maxLength) {
     this.maxLength = maxLength;
-    return this;
-  }
-
-  public long getSumLength() {
-    return sumLength;
-  }
-
-  public StatsPojo setSumLength(long sumLength) {
-    this.sumLength = sumLength;
     return this;
   }
 
@@ -615,49 +658,49 @@ public class StatsPojo implements Serializable {
     return dateValues;
   }
 
-  public Map<String, Long> getTopValues() {
+  public Map<String, Integer> getTopValues() {
     return topValues;
   }
 
-  public void setTopValues(Map<String, Long> topValues) {
+  public void setTopValues(Map<String, Integer> topValues) {
     this.topValues = topValues;
   }
 
   /**
-   * Set the top values.
+   * Set top values utility method.
    * 
-   * @param it the top values iterator (as value, count)
-   * @return this object (having topValues updated)
+   * @param it the tuples iterator
+   * @return this object
    */
   public StatsPojo setTopValues(Iterable<Tuple2<String, Long>> it) {
     this.topValues = new HashMap<>();
     if (it != null) {
       for (Tuple2<String, Long> tuple : it) {
-        this.topValues.put(tuple.f0, tuple.f1);
+        this.topValues.put(tuple.f0, tuple.f1.intValue());
       }
     }
     return this;
   }
 
-  public Map<String, Long> getTopPatterns() {
+  public Map<String, Integer> getTopPatterns() {
     return topPatterns;
   }
 
-  public void setTopPatterns(Map<String, Long> topPatterns) {
+  public void setTopPatterns(Map<String, Integer> topPatterns) {
     this.topPatterns = topPatterns;
   }
 
   /**
-   * Set the top patterns.
+   * Set top patterns utility method.
    * 
-   * @param it the patterns iterator (as pattern, count)
-   * @return this object (having topPatterns updated)
+   * @param it the tuples iterator
+   * @return this object
    */
   public StatsPojo setTopPatterns(Iterable<Tuple2<String, Long>> it) {
     this.topPatterns = new HashMap<>();
     if (it != null) {
       for (Tuple2<String, Long> tuple : it) {
-        this.topPatterns.put(tuple.f0, tuple.f1);
+        this.topPatterns.put(tuple.f0, tuple.f1.intValue());
       }
     }
     return this;
@@ -693,6 +736,11 @@ public class StatsPojo implements Serializable {
 
   public void setKurtosis(double kurtosis) {
     this.kurtosis = kurtosis;
+  }
+
+  @Override
+  public int compareTo(StatsPojo o) {
+    return getColumnIndex() - o.getColumnIndex();
   }
 
 }

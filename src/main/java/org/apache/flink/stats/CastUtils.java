@@ -2,6 +2,7 @@ package org.apache.flink.stats;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.util.Date;
 
 public class CastUtils {
 
@@ -55,6 +56,9 @@ public class CastUtils {
     }
     if (val instanceof Long) {
       return ((Long) val).doubleValue();
+    }
+    if (val instanceof Date) {
+      return (double) ((Date) val).getTime();
     }
     //
     throw new IllegalArgumentException("Class " + val.getClass() + " cannot be cast to Double");
